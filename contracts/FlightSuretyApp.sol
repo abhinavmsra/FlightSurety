@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./FlightSuretyData.sol";
 
 /************************************************** */
@@ -15,6 +17,7 @@ contract FlightSuretyApp {
     /********************************************************************************************/
 
     int8 constant MAX_FOUNDERS = 4;
+    uint256 constant MINIMUM_FUNDING = 10 ether;
 
     address private contractOwner;          // Account used to deploy contract
     FlightSuretyData private dataContract;
@@ -32,7 +35,7 @@ contract FlightSuretyApp {
     *      the event there is an issue that needs to be fixed
     */
     modifier requireIsOperational() {
-        require(dataContract.isOperational(), "Contract is currently not operational");  
+        require(isOperational(), "Contract is currently not operational");  
         _;
     }
 
@@ -49,6 +52,11 @@ contract FlightSuretyApp {
         _;
     }
 
+    modifier requireMinimumFunding() {
+        require(msg.value >= MINIMUM_FUNDING, "Must send at least 10 ether");
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
@@ -62,7 +70,7 @@ contract FlightSuretyApp {
         dataContract = FlightSuretyData(_dataContractAddress);
         
         // Create a default airlines
-        _registerAirline(contractOwner, _airlineName);
+        _registerNewAirline(contractOwner, _airlineName);
     }
 
     /********************************************************************************************/
@@ -81,27 +89,51 @@ contract FlightSuretyApp {
     * @dev Add an airline to the registration queue
     *
     */   
-    function registerAirline(address _airlineAddress, string calldata _airlineName) external requireIsOperational requireRegisteredAirline returns(int8 id, string memory name) {
-         (id, name) = _registerAirline(_airlineAddress, _airlineName);
+    function registerAirline(
+        address _airlineAddress, 
+        string calldata _airlineName
+    ) 
+        external 
+        requireIsOperational 
+        requireRegisteredAirline 
+    {
+        if (dataContract.getAirlineId(_airlineAddress) == 0) { // Registration Request
+            _registerNewAirline(_airlineAddress, _airlineName);
+        } else { // Voting
+            _voteAirline(_airlineAddress);
+        }
     }
 
-    /**
-    * @dev Get an airline from address
-    *
-    */   
-    function getAirlineName(address _airlineAddress) external view returns(string memory) {
-        return dataContract.getAirlineName(_airlineAddress);
+    receive() external payable requireRegisteredAirline requireMinimumFunding { _receiveFunds(); }
+    fallback() external payable requireRegisteredAirline requireMinimumFunding { _receiveFunds(); }
+
+    /********************************************************************************************/
+    /*                                     PRIVATE FUNCTIONS                                    */
+    /********************************************************************************************/
+    function _registerNewAirline(address _airlineAddress, string memory _airlineName) private {
+        dataContract.registerAirline(
+            msg.sender,
+            _airlineAddress, 
+            _airlineName, 
+            dataContract.getAirlinesCount() < MAX_FOUNDERS // consensus
+        );
     }
 
-    /**
-    * @dev Get founders of the contract
-    *
-    */   
-    function getAirlinesCount() external view returns(int8) {
-        return dataContract.getAirlinesCount();
+    function _voteAirline(address _airlineAddress) private {
+        uint256 airlineVoteCount = SafeCast.toUint256(dataContract.voteAirline(msg.sender, _airlineAddress));
+        uint256 totalAirlineCount = SafeCast.toUint256(dataContract.getAirlinesCount() - 1); // One being the airline itself
+
+        if(
+            SafeMath.div(
+                SafeMath.mul(airlineVoteCount, 100), 
+                totalAirlineCount
+            ) >= 50) {
+                dataContract.approveAirline(_airlineAddress);   
+        }
     }
 
-    function _registerAirline(address _airlineAddress, string memory _airlineName) private returns(int8 id, string memory name) {
-        (id, name) = dataContract.registerAirline(_airlineAddress, _airlineName);
+    function _receiveFunds() private {
+        dataContract.addAirlineBalance(msg.sender, msg.value);
+        dataContract.activateAirline(msg.sender);
     }
 }   
