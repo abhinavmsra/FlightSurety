@@ -22,6 +22,8 @@ contract FlightSuretyData {
 
     mapping(address => mapping(address => bool)) votes; // { voterAddress => { airlineAddress => true }}
     mapping(address => Airline) airlines;
+
+    mapping(address => uint256) insurances;
     int8 airlinesCount;
 
     /********************************************************************************************/
@@ -165,6 +167,14 @@ contract FlightSuretyData {
 
     function activateAirline(address _airlineAddress) external {
        airlines[_airlineAddress].activated = true;
+    }
+
+    function addInsurance(address passengerAddr, uint256 amount) external {
+        insurances[passengerAddr] += amount;
+    }
+
+    function getInsurance(address passengerAddr) external view returns(uint256) {
+        return insurances[passengerAddr];
     }
 
     /********************************************************************************************/

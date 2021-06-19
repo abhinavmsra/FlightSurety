@@ -48,7 +48,7 @@ contract FlightSuretyApp {
     }
 
     modifier requireRegisteredAirline() {
-        require(dataContract.getAirlineId(msg.sender) != 0, "Caller must be a airline");
+        require(isAirline(msg.sender), "Caller must be a airline");
         _;
     }
 
@@ -77,8 +77,12 @@ contract FlightSuretyApp {
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-    function isOperational() public view returns(bool) {
+    function isOperational() private view returns(bool) {
         return dataContract.isOperational();
+    }
+
+    function isAirline(address addr) private view returns(bool) {
+        return dataContract.getAirlineId(addr) != 0;
     }
 
     /********************************************************************************************/
@@ -88,7 +92,7 @@ contract FlightSuretyApp {
    /**
     * @dev Add an airline to the registration queue
     *
-    */   
+    **/   
     function registerAirline(
         address _airlineAddress, 
         string calldata _airlineName
@@ -104,8 +108,12 @@ contract FlightSuretyApp {
         }
     }
 
-    receive() external payable requireRegisteredAirline requireMinimumFunding { _receiveFunds(); }
-    fallback() external payable requireRegisteredAirline requireMinimumFunding { _receiveFunds(); }
+    function getInsurance(address passengerAddr) external view returns(uint256 amount) {
+        return dataContract.getInsurance(passengerAddr);
+    }
+
+    receive() external payable { _receiveFunds(); }
+    fallback() external payable { _receiveFunds(); }
 
     /********************************************************************************************/
     /*                                     PRIVATE FUNCTIONS                                    */
@@ -133,7 +141,28 @@ contract FlightSuretyApp {
     }
 
     function _receiveFunds() private {
+        if (isAirline(msg.sender)) {
+            return _receiveAirlineFunds();
+        }
+
+        _receiveInsuranceFunds();
+    }
+
+    function _receiveAirlineFunds() private requireRegisteredAirline requireMinimumFunding {
         dataContract.addAirlineBalance(msg.sender, msg.value);
         dataContract.activateAirline(msg.sender);
+    }
+
+    function _receiveInsuranceFunds() private {
+        if (msg.value <= 1 ether) {
+            dataContract.addInsurance(msg.sender, msg.value);
+            return;
+        }
+
+        dataContract.addInsurance(msg.sender, 1 ether);
+        
+        // Refund remaining ether
+        (bool sent,) = msg.sender.call{value: (msg.value - 1 ether)}("");
+        require(sent, "Failed to refund Ether");
     }
 }   

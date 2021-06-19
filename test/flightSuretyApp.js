@@ -180,17 +180,48 @@ contract("FlightSuretyApp", accounts => {
     });
 
     describe('when sender is not an airline', () => {
-      it("reverts transaction", async () => {
+      it("creates an insurance", async () => {
         const dataContractOwner = accounts[0];
         const appContractOwner = accounts[1];
 
         const dataContract = await FlightSuretyData.new({from: dataContractOwner});
         const appContract = await FlightSuretyApp.new(dataContract.address, 'Crypto Airlines', { from: appContractOwner });
 
-        await truffleAssert.fails(
-          appContract.sendTransaction({ from: accounts[2], value: 10000000000000000000 }),
-          truffleAssert.ErrorType.REVERT,
-          "Caller must be a airline"
+        const insuranceAmount = 10000;
+        appContract.sendTransaction({ from: accounts[2], value: insuranceAmount })
+
+        assert.equal(
+          await appContract.getInsurance(accounts[2]), 
+          insuranceAmount,
+          "must equal provided amount"
+        );
+      });
+
+      it("refunds if sent more than 1 ether", async () => {
+        const dataContractOwner = accounts[0];
+        const appContractOwner = accounts[1];
+
+        const dataContract = await FlightSuretyData.new({from: dataContractOwner});
+        const appContract = await FlightSuretyApp.new(dataContract.address, 'Crypto Airlines', { from: appContractOwner });
+
+        const passenger = accounts[2];
+        const initialPassengerBalance = web3.utils.fromWei(await web3.eth.getBalance(passenger));
+        const transferredAmount = "2";
+        const gasPrice = "10000000000";
+
+        const txHash = await appContract.sendTransaction({ from: passenger, gasPrice: gasPrice, value: web3.utils.toWei(transferredAmount) });
+
+        const contractBalance  = web3.utils.fromWei(await web3.eth.getBalance(appContract.address));
+        const passengerBalance = web3.utils.fromWei(await web3.eth.getBalance(passenger));
+        const insuranceBalance = web3.utils.fromWei(await appContract.getInsurance(passenger));
+        const totalGasAmount   = parseFloat(web3.utils.fromWei(gasPrice)) * txHash.receipt.gasUsed;
+
+        assert.equal(contractBalance, "1", "contract balance must equal 1 ether");
+        assert.equal(insuranceBalance, "1", "insurance balance must equal 1 ether");
+        assert.equal(
+          parseFloat(initialPassengerBalance), 
+          parseFloat(passengerBalance) + parseFloat(1) + parseFloat(totalGasAmount), 
+          "net total must be same"
         );
       });
     });
