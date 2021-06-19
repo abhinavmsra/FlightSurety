@@ -5,7 +5,6 @@ import './flightsurety.css';
 
 
 (async() => {
-
     let result = null;
 
     let contract = new Contract('localhost', () => {

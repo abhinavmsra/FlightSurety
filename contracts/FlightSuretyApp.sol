@@ -94,7 +94,7 @@ contract FlightSuretyApp {
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-    function isOperational() private view returns(bool) {
+    function isOperational() public view returns(bool) {
         return dataContract.isOperational();
     }
 
