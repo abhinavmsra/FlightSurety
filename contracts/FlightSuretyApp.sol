@@ -133,15 +133,16 @@ contract FlightSuretyApp {
     * @dev Register a future flight for insuring.
     *
     */  
-    function registerFlight(uint256 timestamp) external requireRegisteredAirline {
-        bytes32 key = keccak256(abi.encodePacked(timestamp, msg.sender)); // assuming an airline has only one flight at one time
-        flights[key] = Flight({ isRegistered: true, statusCode: STATUS_CODE_UNKNOWN, updatedTimestamp: timestamp, airline: msg.sender });
+    function registerFlight(uint256 _timestamp) external requireRegisteredAirline {
+        bytes32 key = keccak256(abi.encodePacked(_timestamp, msg.sender)); // assuming an airline has only one flight at one time
+        flights[key] = Flight({ isRegistered: true, statusCode: STATUS_CODE_UNKNOWN, updatedTimestamp: _timestamp, airline: msg.sender });
     }
 
-    function fetchFlight(uint256 timestamp, address airline) external view returns(bool, uint8, uint256, address) {
-        bytes32 key = keccak256(abi.encodePacked(timestamp, airline));
+    function fetchFlight(uint256 _timestamp, address _airline) external view returns(uint256, string memory) {
+        bytes32 key = keccak256(abi.encodePacked(_timestamp, _airline));
+        (,string memory airlineName,,,,) = dataContract.getAirline(_airline);
 
-        return(flights[key].isRegistered, flights[key].statusCode, flights[key].updatedTimestamp, flights[key].airline);
+        return(flights[key].updatedTimestamp, airlineName);
     }
     
    /**

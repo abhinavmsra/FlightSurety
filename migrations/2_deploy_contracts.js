@@ -39,7 +39,7 @@ module.exports = async function(deployer, _, accounts) {
   let timestamps = [];
   for(let i = 0; i < 5; i++) {
     const timestamp = getRandomHourTimestamps();
-    timestamps.push(timestamp);
+    timestamps.push([timestamp, accounts[i+1]]);
 
     await appContract.registerFlight(timestamp, { from: accounts[i+1] });
   }
