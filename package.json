@@ -27,10 +27,13 @@
     "file-loader": "^6.2.0",
     "html-loader": "^2.1.2",
     "html-webpack-plugin": "^4.5.2",
+    "start-server-webpack-plugin": "^2.2.5",
     "style-loader": "^2.0.0",
+    "truffle-assertions": "^0.9.2",
     "webpack": "^4.28.1",
     "webpack-cli": "^3.2.1",
-    "webpack-dev-server": "^3.1.14"
+    "webpack-dev-server": "^3.1.14",
+    "webpack-node-externals": "^3.0.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.1.0",
