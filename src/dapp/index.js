@@ -21,9 +21,19 @@ function onInsurancePurchase(event) {
     const flightId = event.target.querySelector("#flightId").value;
 
     appContract.buyInsuranceFor(flightId, amount, (result) => {
-        console.log(result);
         $('#modalInsurance').modal('hide');
+        location.reload();
     });
+}
+
+function renderBuyInsurance(flight) {
+    if(flight.amount === "0") {
+        return(
+            html`<button type="button" class="btn btn-primary" data-airline=${flight.id} @click=${openModal}>BUY</button>`
+        )
+    } 
+
+    return html`<button type="button" class="btn btn-success">${flight.amount} Ether</button>`
 }
 
 function airlineTableTemplate(flights) {
@@ -34,7 +44,7 @@ function airlineTableTemplate(flights) {
                     <td scope="row">${flight.name}</td>
                     <td>${new Date(flight.timestamp*1000)}</td>
                     <td>
-                        <button type="button" class="btn btn-primary" data-airline=${flight.id} @click=${openModal}>BUY</button>
+                        ${renderBuyInsurance(flight)}
                         <button type="button" class="btn btn-info" data-airline=${flight.id}>CHECK STATUS</button>
                     </td>
                 </tr>

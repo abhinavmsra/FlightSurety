@@ -19,13 +19,20 @@ class Contract {
     }
 
     async loadFlights() {
-        const { fetchFlight } = this.contract.methods;
+        const { fetchFlight, getInsurance } = this.contract.methods;
         let flights = [];
 
         await Promise.all(
             config[this.networkName].flights.map(async flight => {
                 const results = await fetchFlight(flight[0], flight[1]).call();
-                flights.push({ name: results.airlineName, timestamp: results.timestamp, id: results.flightId });
+                const insuranceAmount = await getInsurance(results.flightId).call({from: this.account});
+
+                flights.push({ 
+                    name: results.airlineName, 
+                    timestamp: results.timestamp, 
+                    id: results.flightId,
+                    amount: this.web3.utils.fromWei(insuranceAmount)
+                });
             })
         );
 
