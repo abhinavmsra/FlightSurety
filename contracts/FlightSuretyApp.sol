@@ -125,10 +125,6 @@ contract FlightSuretyApp {
         }
     }
 
-    function getInsurance(address passengerAddr) external view returns(uint256 amount) {
-        return dataContract.getInsurance(passengerAddr);
-    }
-
     /**
     * @dev Register a future flight for insuring.
     *
@@ -138,11 +134,38 @@ contract FlightSuretyApp {
         flights[key] = Flight({ isRegistered: true, statusCode: STATUS_CODE_UNKNOWN, updatedTimestamp: _timestamp, airline: msg.sender });
     }
 
-    function fetchFlight(uint256 _timestamp, address _airline) external view returns(uint256, string memory) {
+    function fetchFlight(
+        uint256 _timestamp, 
+        address _airline
+    ) 
+        external 
+        view 
+        returns(uint256 timestamp, string memory airlineName, bytes32 flightId) 
+    {
         bytes32 key = keccak256(abi.encodePacked(_timestamp, _airline));
-        (,string memory airlineName,,,,) = dataContract.getAirline(_airline);
 
-        return(flights[key].updatedTimestamp, airlineName);
+        timestamp = flights[key].updatedTimestamp;
+        (,airlineName,,,,) = dataContract.getAirline(_airline);
+        flightId = key;
+    }
+
+    function buyInsurance(bytes32 _flightId) external payable {
+        require(msg.value > 0, "must send some ether");
+        
+        if (msg.value <= 1 ether) {
+            dataContract.addInsurance(msg.sender, _flightId, msg.value);
+            return;
+        }
+
+        dataContract.addInsurance(msg.sender, _flightId, 1 ether);
+        
+        // Refund remaining ether
+        (bool sent,) = msg.sender.call{value: (msg.value - 1 ether)}("");
+        require(sent, "Failed to refund Ether");
+    }
+
+    function getInsurance(bytes32 _flightId) external view returns(uint256 amount) {
+        amount = dataContract.getInsurance(msg.sender, _flightId);
     }
     
    /**
@@ -182,8 +205,8 @@ contract FlightSuretyApp {
         emit OracleRequest(index, airline, flight, timestamp);
     }
 
-    receive() external payable { _receiveFunds(); }
-    fallback() external payable { _receiveFunds(); }
+    receive() external payable { _receiveAirlineFunds(); }
+    fallback() external payable { _receiveAirlineFunds(); }
 
     /********************************************************************************************/
     /*                                     PRIVATE FUNCTIONS                                    */
@@ -210,30 +233,9 @@ contract FlightSuretyApp {
         }
     }
 
-    function _receiveFunds() private {
-        if (isAirline(msg.sender)) {
-            return _receiveAirlineFunds();
-        }
-
-        _receiveInsuranceFunds();
-    }
-
     function _receiveAirlineFunds() private requireRegisteredAirline requireMinimumFunding {
         dataContract.addAirlineBalance(msg.sender, msg.value);
         dataContract.activateAirline(msg.sender);
-    }
-
-    function _receiveInsuranceFunds() private {
-        if (msg.value <= 1 ether) {
-            dataContract.addInsurance(msg.sender, msg.value);
-            return;
-        }
-
-        dataContract.addInsurance(msg.sender, 1 ether);
-        
-        // Refund remaining ether
-        (bool sent,) = msg.sender.call{value: (msg.value - 1 ether)}("");
-        require(sent, "Failed to refund Ether");
     }
 
     /********************************************************************************************/

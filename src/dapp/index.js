@@ -1,45 +1,70 @@
 
-import DOM from './dom';
+import Web3 from 'web3';
+import {html, render} from 'lit-html';
+
+import config from './config.json';
 import Contract from './contract';
+
 import './flightsurety.css';
 
-(async() => {
-    let contract = new Contract('localhost', () => {
-        // Read transaction
-        contract.isOperational((error, result) => {
-            console.log(error,result);
-            display('Operational Status', 'Check if contract is operational', [ { label: 'Operational Status', error: error, value: result} ]);
-        });
-    
-        // User-submitted transaction
-        DOM.elid('submit-oracle').addEventListener('click', () => {
-            let flight = DOM.elid('flight-number').value;
-            // Write transaction
-            contract.fetchFlightStatus(flight, (error, result) => {
-                display('Oracles', 'Trigger oracles', [ { label: 'Fetch Flight Status', error: error, value: result.flight + ' ' + result.timestamp} ]);
-            });
-        })
-    });
-})();
+function openModal(event) {
+    event.preventDefault();
+    document.querySelector("#flightId").value = event.target.dataset.airline;
 
-
-function display(title, description, results) {
-    let displayDiv = DOM.elid("display-wrapper");
-    let section = DOM.section();
-    section.appendChild(DOM.h2(title));
-    section.appendChild(DOM.h5(description));
-    results.map((result) => {
-        let row = section.appendChild(DOM.div({className:'row'}));
-        row.appendChild(DOM.div({className: 'col-sm-4 field'}, result.label));
-        row.appendChild(DOM.div({className: 'col-sm-8 field-value'}, result.error ? String(result.error) : String(result.value)));
-        section.appendChild(row);
-    })
-    displayDiv.append(section);
+    $('#modalInsurance').modal('show');
 }
 
+function onInsurancePurchase(event) {
+    event.preventDefault();
 
+    const amount = event.target.querySelector("#amount").value;
+    const flightId = event.target.querySelector("#flightId").value;
 
+    appContract.buyInsuranceFor(flightId, amount, (result) => {
+        console.log(result);
+        $('#modalInsurance').modal('hide');
+    });
+}
 
+function airlineTableTemplate(flights) {
+    return(
+        html`
+            ${flights.map((flight) => html`
+                <tr>
+                    <td scope="row">${flight.name}</td>
+                    <td>${new Date(flight.timestamp*1000)}</td>
+                    <td>
+                        <button type="button" class="btn btn-primary" data-airline=${flight.id} @click=${openModal}>BUY</button>
+                        <button type="button" class="btn btn-info" data-airline=${flight.id}>CHECK STATUS</button>
+                    </td>
+                </tr>
+            `)}
+        `
+    );
+}
 
+window.addEventListener("load", async function() {
+    const networkName = "localhost";
+    let web3 = undefined;
 
+    if (window.ethereum) {
+        web3 = new Web3(Web3.givenProvider || new Web3.providers.HttpProvider(config[networkName].url)); // use MetaMask's provider
+        await window.ethereum.enable(); // get permission to access accounts
+    } else {
+        console.warn("No web3 detected. Falling back to http://127.0.0.1:9545. You should remove this fallback when you deploy live",);
+        web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:9545"));
+    }
 
+    const accounts = await web3.eth.getAccounts();
+    window.appContract = new Contract(web3, networkName, accounts[0]);
+
+    const flights = await appContract.loadFlights();
+    render(airlineTableTemplate(flights), document.querySelector("#tableAirline tbody"));
+
+    this.document.querySelector("#formInsurance").addEventListener("submit", onInsurancePurchase);
+
+    $('#modalInsurance').on('hidden.bs.modal', function (e) {
+        document.querySelector("#amount").value = "";
+        document.querySelector("#flightId").value = "";
+    });
+});

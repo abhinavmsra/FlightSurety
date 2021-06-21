@@ -36,10 +36,10 @@ module.exports = async function(deployer, _, accounts) {
   await appContract.sendTransaction({ from: accounts[5], value: amount });
 
   // Register Flights
-  let timestamps = [];
+  let flights = [];
   for(let i = 0; i < 5; i++) {
     const timestamp = getRandomHourTimestamps();
-    timestamps.push([timestamp, accounts[i+1]]);
+    flights.push([timestamp, accounts[i+1]]);
 
     await appContract.registerFlight(timestamp, { from: accounts[i+1] });
   }
@@ -49,7 +49,7 @@ module.exports = async function(deployer, _, accounts) {
         url: 'http://localhost:7545',
         dataAddress: FlightSuretyData.address,
         appAddress: FlightSuretyApp.address,
-        timestamps: timestamps
+        flights: flights
     }
   };
 

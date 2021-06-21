@@ -23,13 +23,12 @@ contract FlightSuretyData {
     mapping(address => mapping(address => bool)) votes; // { voterAddress => { airlineAddress => true }}
     mapping(address => Airline) airlines;
 
-    mapping(address => uint256) insurances;
+    mapping(bytes32 => uint256) insurances;
     int8 airlinesCount;
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
-
 
     /**
     * @dev Constructor
@@ -169,12 +168,14 @@ contract FlightSuretyData {
        airlines[_airlineAddress].activated = true;
     }
 
-    function addInsurance(address passengerAddr, uint256 amount) external {
-        insurances[passengerAddr] += amount;
+    function addInsurance(address passengerAddr, bytes32 _flightId, uint256 amount) external {
+        bytes32 key = keccak256(abi.encodePacked(passengerAddr, _flightId));
+        insurances[key] += amount;
     }
 
-    function getInsurance(address passengerAddr) external view returns(uint256) {
-        return insurances[passengerAddr];
+    function getInsurance(address passengerAddr, bytes32 _flightId) external view returns(uint256) {
+        bytes32 key = keccak256(abi.encodePacked(passengerAddr, _flightId));
+        return insurances[key];
     }
 
     /********************************************************************************************/
