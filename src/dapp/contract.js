@@ -30,6 +30,7 @@ class Contract {
                 flights.push({ 
                     name: results.airlineName, 
                     timestamp: results.timestamp, 
+                    airlineId: flight[1],
                     id: results.flightId,
                     amount: this.web3.utils.fromWei(insuranceAmount)
                 });
@@ -37,6 +38,12 @@ class Contract {
         );
 
         return flights;
+    }
+
+    async fetchFlightStatus(flightId, airline) {
+        const { fetchFlightStatus } = this.contract.methods;
+
+        await fetchFlightStatus(airline, flightId, parseInt(Date.now() / 1000)).send({ from: this.account });
     }
 }
 

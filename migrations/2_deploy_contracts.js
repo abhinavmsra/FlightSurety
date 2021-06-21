@@ -1,5 +1,6 @@
 const FlightSuretyApp = artifacts.require("FlightSuretyApp");
 const FlightSuretyData = artifacts.require("FlightSuretyData");
+const Web3 = require('web3');
 const fs = require('fs');
 
 const airlineNames = [
@@ -44,7 +45,7 @@ module.exports = async function(deployer, _, accounts) {
     await appContract.registerFlight(timestamp, { from: accounts[i+1] });
   }
 
-  const config = {
+  let config = {
     localhost: {
         url: 'http://localhost:7545',
         dataAddress: FlightSuretyData.address,
@@ -54,6 +55,20 @@ module.exports = async function(deployer, _, accounts) {
   };
 
   fs.writeFileSync(__dirname + '/../src/dapp/config.json', JSON.stringify(config, null, '\t'), 'utf-8');
+
+  // Register Oracles
+  config.localhost.oracles = {};
+
+  await Promise.all(
+    accounts.map(async account => {
+      await appContract.registerOracle({ from: account, value: web3.utils.toWei("1") });
+
+      config.localhost.oracles[account] = (await appContract.getMyIndexes({ from: account })).map(index => {
+        return parseInt(index);
+      });
+    })
+  );
+  
   fs.writeFileSync(__dirname + '/../src/server/config.json', JSON.stringify(config, null, '\t'), 'utf-8');
 }
 

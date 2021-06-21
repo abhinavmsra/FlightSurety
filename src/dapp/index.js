@@ -26,6 +26,18 @@ function onInsurancePurchase(event) {
     });
 }
 
+function fetchStatusHandler(event) {
+    event.preventDefault();
+
+    const flightId = event.target.dataset.flight;
+    const airline = event.target.dataset.airline;
+
+    // Write transaction
+    appContract.fetchFlightStatus(flightId, airline, (error, result) => {
+        debugger
+    });
+}
+
 function renderBuyInsurance(flight) {
     if(flight.amount === "0") {
         return(
@@ -45,7 +57,13 @@ function airlineTableTemplate(flights) {
                     <td>${new Date(flight.timestamp*1000)}</td>
                     <td>
                         ${renderBuyInsurance(flight)}
-                        <button type="button" class="btn btn-info" data-airline=${flight.id}>CHECK STATUS</button>
+                        <button type="button" 
+                                class="btn btn-info" 
+                                data-airline=${flight.airlineId} 
+                                data-flight=${flight.id} 
+                                @click=${fetchStatusHandler}>
+                            CHECK STATUS
+                        </button>
                     </td>
                 </tr>
             `)}
