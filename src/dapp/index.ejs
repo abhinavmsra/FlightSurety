@@ -28,8 +28,10 @@
             <table class="table" id="tableAirline">
                 <thead>
                   <tr>
+                    <th scope="col">Flight</th>
                     <th scope="col">Airlines</th>
                     <th scope="col">Time</th>
+                    <th scope="col">Status</th>
                     <th scope="col">Actions</th>
                   </tr>
                 </thead>
@@ -50,7 +52,9 @@
             <div class="modal-body">
                 <form class="form-inline" id="formInsurance">
                     <div class="form-group mx-sm-3 mb-2">
-                        <input type="hidden" id="flightId">
+                        <input type="hidden" id="airline">
+                        <input type="hidden" id="flight">
+                        <input type="hidden" id="timestamp">
                         <label for="amount" class="sr-only">Amount</label>
                         <input type="number" min="0.01" max="1" step=".01" class="form-control" id="amount" placeholder="Ether">
                     </div>

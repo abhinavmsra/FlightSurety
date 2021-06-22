@@ -7,9 +7,22 @@ import Contract from './contract';
 
 import './flightsurety.css';
 
+const STATUS_CODES = {
+    "0": "STATUS_CODE_UNKNOWN",
+    "10": "ON_TIME",
+    "20": "LATE_AIRLINE",
+    "30": "LATE_WEATHER",
+    "40": "LATE_TECHNICAL",
+    "50": "LATE_OTHER"
+}
+
 function openModal(event) {
     event.preventDefault();
-    document.querySelector("#flightId").value = event.target.dataset.airline;
+    const { airline, flight, timestamp } = event.target.closest('tr').dataset;
+    
+    document.querySelector("#airline").value = airline;
+    document.querySelector("#flight").value = flight;
+    document.querySelector("#timestamp").value = timestamp;
 
     $('#modalInsurance').modal('show');
 }
@@ -18,9 +31,11 @@ function onInsurancePurchase(event) {
     event.preventDefault();
 
     const amount = event.target.querySelector("#amount").value;
-    const flightId = event.target.querySelector("#flightId").value;
+    const airline = event.target.querySelector("#airline").value;
+    const flight = event.target.querySelector("#flight").value;
+    const timestamp = event.target.querySelector("#timestamp").value;
 
-    appContract.buyInsuranceFor(flightId, amount, (result) => {
+    appContract.buyInsuranceFor(airline, flight, timestamp, amount, (result) => {
         $('#modalInsurance').modal('hide');
         location.reload();
     });
@@ -29,11 +44,10 @@ function onInsurancePurchase(event) {
 function fetchStatusHandler(event) {
     event.preventDefault();
 
-    const flightId = event.target.dataset.flight;
-    const airline = event.target.dataset.airline;
+    const { airline, flight, timestamp } = event.target.closest('tr').dataset;
 
     // Write transaction
-    appContract.fetchFlightStatus(flightId, airline, (error, result) => {
+    appContract.fetchFlightStatus(airline, flight, timestamp, (error, result) => {
         debugger
     });
 }
@@ -41,7 +55,7 @@ function fetchStatusHandler(event) {
 function renderBuyInsurance(flight) {
     if(flight.amount === "0") {
         return(
-            html`<button type="button" class="btn btn-primary" data-airline=${flight.id} @click=${openModal}>BUY</button>`
+            html`<button type="button" class="btn btn-primary" @click=${openModal}>BUY</button>`
         )
     } 
 
@@ -52,16 +66,14 @@ function airlineTableTemplate(flights) {
     return(
         html`
             ${flights.map((flight) => html`
-                <tr>
-                    <td scope="row">${flight.name}</td>
-                    <td>${new Date(flight.timestamp*1000)}</td>
+                <tr data-airline=${flight.airline} data-flight=${flight.name} data-timestamp=${flight.timestamp}>
+                    <td>${flight.name}</td>
+                    <td>${flight.airlineName}</td>
+                    <td>${new Date(flight.timestamp*1000).toLocaleString("en-US")}</td>
+                    <td>${STATUS_CODES[flight.statusCode]}</td>
                     <td>
                         ${renderBuyInsurance(flight)}
-                        <button type="button" 
-                                class="btn btn-info" 
-                                data-airline=${flight.airlineId} 
-                                data-flight=${flight.id} 
-                                @click=${fetchStatusHandler}>
+                        <button type="button" class="btn btn-info" @click=${fetchStatusHandler}>
                             CHECK STATUS
                         </button>
                     </td>
@@ -93,6 +105,21 @@ window.addEventListener("load", async function() {
 
     $('#modalInsurance').on('hidden.bs.modal', function (e) {
         document.querySelector("#amount").value = "";
-        document.querySelector("#flightId").value = "";
+        document.querySelector("#airline").value = "";
+        document.querySelector("#flight").value = "";
+        document.querySelector("#timestamp").value = "";
     });
+
+    const { FlightStatusInfo } = window.appContract.contract.events;
+
+    FlightStatusInfo({fromBlock: 0}, (error, event) => {
+        if(error) { return; }
+
+        flights.forEach(flight => { 
+            if(flight.name === event.returnValues.flight) { flight.statusCode = event.returnValues.status; }
+        });
+
+        render(airlineTableTemplate(flights), document.querySelector("#tableAirline tbody"));
+    })
+
 });

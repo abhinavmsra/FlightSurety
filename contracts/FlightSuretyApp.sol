@@ -129,43 +129,48 @@ contract FlightSuretyApp {
     * @dev Register a future flight for insuring.
     *
     */  
-    function registerFlight(uint256 _timestamp) external requireRegisteredAirline {
-        bytes32 key = keccak256(abi.encodePacked(_timestamp, msg.sender)); // assuming an airline has only one flight at one time
+    function registerFlight(string calldata _flight, uint256 _timestamp) external requireRegisteredAirline {
+        bytes32 key = getFlightKey(msg.sender, _flight, _timestamp);
+
         flights[key] = Flight({ isRegistered: true, statusCode: STATUS_CODE_UNKNOWN, updatedTimestamp: _timestamp, airline: msg.sender });
     }
 
     function fetchFlight(
-        uint256 _timestamp, 
-        address _airline
+        address _airline,
+        string calldata _flight,
+        uint256 _timestamp
     ) 
         external 
         view 
-        returns(uint256 timestamp, string memory airlineName, bytes32 flightId) 
+        returns(uint256 timestamp, uint8 statusCode, string memory airlineName) 
     {
-        bytes32 key = keccak256(abi.encodePacked(_timestamp, _airline));
+        bytes32 key = getFlightKey(_airline, _flight, _timestamp);
 
         timestamp = flights[key].updatedTimestamp;
+        statusCode = flights[key].statusCode;
         (,airlineName,,,,) = dataContract.getAirline(_airline);
-        flightId = key;
     }
 
-    function buyInsurance(bytes32 _flightId) external payable {
+    function buyInsurance(address _airline, string calldata _flight, uint256 _timestamp) external payable {
         require(msg.value > 0, "must send some ether");
         
+        bytes32 key = getFlightKey(_airline, _flight, _timestamp);
+
         if (msg.value <= 1 ether) {
-            dataContract.addInsurance(msg.sender, _flightId, msg.value);
+            dataContract.addInsurance(msg.sender, key, msg.value);
             return;
         }
 
-        dataContract.addInsurance(msg.sender, _flightId, 1 ether);
+        dataContract.addInsurance(msg.sender, key, 1 ether);
         
         // Refund remaining ether
         (bool sent,) = msg.sender.call{value: (msg.value - 1 ether)}("");
         require(sent, "Failed to refund Ether");
     }
 
-    function getInsurance(bytes32 _flightId) external view returns(uint256 amount) {
-        amount = dataContract.getInsurance(msg.sender, _flightId);
+    function getInsurance(address _airline, string calldata _flight, uint256 _timestamp) external view returns(uint256 amount) {
+        bytes32 key = getFlightKey(_airline, _flight, _timestamp);
+        amount = dataContract.getInsurance(msg.sender, key);
     }
     
    /**
@@ -174,16 +179,16 @@ contract FlightSuretyApp {
     */  
     function processFlightStatus
     (
-        address airline,
-        string memory flight,
-        uint256 timestamp,
+        address _airline,
+        string memory _flight,
+        uint256 _timestamp,
         uint8 statusCode
     )
     internal
     {
-
+        bytes32 key = getFlightKey(_airline, _flight, _timestamp);
+        flights[key].statusCode = statusCode;
     }
-
 
     // Generate a request for oracles to fetch flight information
     function fetchFlightStatus
@@ -337,7 +342,7 @@ contract FlightSuretyApp {
     function getFlightKey
     (
         address airline,
-        string calldata flight,
+        string memory flight,
         uint256 timestamp
     )
         pure

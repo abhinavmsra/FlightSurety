@@ -9,10 +9,10 @@ class Contract {
         this.contract = new this.web3.eth.Contract(appArtifact.abi, config[networkName].appAddress);  
     }
 
-    async buyInsuranceFor(airline, amount, callback) {
+    async buyInsuranceFor(airline, flight, timestamp, amount, callback) {
         const { buyInsurance } = this.contract.methods;
         
-        buyInsurance(airline)
+        buyInsurance(airline, flight, timestamp)
             .send({from: this.account, value: this.web3.utils.toWei(amount)})
             .on("receipt", callback)
             .on("error", console.error);
@@ -24,14 +24,16 @@ class Contract {
 
         await Promise.all(
             config[this.networkName].flights.map(async flight => {
-                const results = await fetchFlight(flight[0], flight[1]).call();
-                const insuranceAmount = await getInsurance(results.flightId).call({from: this.account});
+                const { name, timestamp, airline } = flight;
+                const results = await fetchFlight(airline, name, timestamp).call();
+                const insuranceAmount = await getInsurance(airline, name, timestamp).call({from: this.account});
 
                 flights.push({ 
-                    name: results.airlineName, 
+                    name, 
+                    airline,
                     timestamp: results.timestamp, 
-                    airlineId: flight[1],
-                    id: results.flightId,
+                    airlineName: results.airlineName,
+                    statusCode: results.statusCode,
                     amount: this.web3.utils.fromWei(insuranceAmount)
                 });
             })
@@ -40,10 +42,10 @@ class Contract {
         return flights;
     }
 
-    async fetchFlightStatus(flightId, airline) {
+    async fetchFlightStatus(airline, flight, timestamp) {
         const { fetchFlightStatus } = this.contract.methods;
 
-        await fetchFlightStatus(airline, flightId, parseInt(Date.now() / 1000)).send({ from: this.account });
+        await fetchFlightStatus(airline, flight, timestamp).send({ from: this.account });
     }
 }
 

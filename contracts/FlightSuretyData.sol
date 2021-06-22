@@ -29,7 +29,7 @@ contract FlightSuretyData {
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
-
+ 
     /**
     * @dev Constructor
     *      The deploying account becomes contractOwner
