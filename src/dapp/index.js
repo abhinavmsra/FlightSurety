@@ -8,7 +8,7 @@ import Contract from './contract';
 import './flightsurety.css';
 
 const STATUS_CODES = {
-    "0": "STATUS_CODE_UNKNOWN",
+    "0": "UNKNOWN",
     "10": "ON_TIME",
     "20": "LATE_AIRLINE",
     "30": "LATE_WEATHER",
@@ -41,6 +41,26 @@ function onInsurancePurchase(event) {
     });
 }
 
+function claimHandler(event) {
+    event.preventDefault();
+
+    const { airline, flight, timestamp } = event.target.closest('tr').dataset;
+
+    appContract.claimInsuranceFor(airline, flight, timestamp, _ => {
+        location.reload();
+    });
+}
+
+function withdrawHandler(event) {
+    event.preventDefault();
+
+    const { airline, flight, timestamp } = event.target.closest('tr').dataset;
+
+    appContract.withdrawInsuranceFor(airline, flight, timestamp, _ => {
+        location.reload();
+    });
+}
+
 function fetchStatusHandler(event) {
     event.preventDefault();
 
@@ -52,14 +72,36 @@ function fetchStatusHandler(event) {
     });
 }
 
-function renderBuyInsurance(flight) {
+function renderAction(flight) {
     if(flight.amount === "0") {
         return(
             html`<button type="button" class="btn btn-primary" @click=${openModal}>BUY</button>`
-        )
-    } 
+        )  
+    }
 
-    return html`<button type="button" class="btn btn-success">${flight.amount} Ether</button>`
+    switch(flight.statusCode) {
+        case "0":
+            return(
+                html`<button type="button" class="btn btn-info" @click=${fetchStatusHandler}>CHECK STATUS</button>`
+            );
+        case "20":
+            switch(flight.insuranceStatus) {
+                case "0":
+                    return(
+                        html`<button type="button" class="btn btn-info" @click=${claimHandler}>CLAIM</button>`
+                    );
+                case "1":
+                    return(
+                        html`<button type="button" class="btn btn-info" @click=${withdrawHandler}>
+                                WITHDRAW ${Web3.utils.fromWei(flight.claimAmount)} Ether
+                            </button>`
+                    );
+                case "2":
+                    return(`WITHDRAWN ${Web3.utils.fromWei(flight.claimAmount)} Ether`);
+            }
+        default:
+            return STATUS_CODES[flight.statusCode];
+    }
 }
 
 function airlineTableTemplate(flights) {
@@ -70,17 +112,15 @@ function airlineTableTemplate(flights) {
                     <td>${flight.name}</td>
                     <td>${flight.airlineName}</td>
                     <td>${new Date(flight.timestamp*1000).toLocaleString("en-US")}</td>
-                    <td>${STATUS_CODES[flight.statusCode]}</td>
-                    <td>
-                        ${renderBuyInsurance(flight)}
-                        <button type="button" class="btn btn-info" @click=${fetchStatusHandler}>
-                            CHECK STATUS
-                        </button>
-                    </td>
+                    <td>${renderAction(flight)}</td>
                 </tr>
             `)}
         `
     );
+}
+
+function renderFlights(flights) {
+    render(airlineTableTemplate(flights), document.querySelector("#tableAirline tbody"));
 }
 
 window.addEventListener("load", async function() {
@@ -99,7 +139,7 @@ window.addEventListener("load", async function() {
     window.appContract = new Contract(web3, networkName, accounts[0]);
 
     const flights = await appContract.loadFlights();
-    render(airlineTableTemplate(flights), document.querySelector("#tableAirline tbody"));
+    renderFlights(flights);
 
     this.document.querySelector("#formInsurance").addEventListener("submit", onInsurancePurchase);
 
@@ -119,7 +159,6 @@ window.addEventListener("load", async function() {
             if(flight.name === event.returnValues.flight) { flight.statusCode = event.returnValues.status; }
         });
 
-        render(airlineTableTemplate(flights), document.querySelector("#tableAirline tbody"));
-    })
-
+        renderFlights(flights)
+    });
 });

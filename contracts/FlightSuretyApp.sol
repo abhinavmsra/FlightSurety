@@ -151,6 +151,19 @@ contract FlightSuretyApp {
         (,airlineName,,,,) = dataContract.getAirline(_airline);
     }
 
+    function getInsurance(
+        address _airline, 
+        string calldata _flight, 
+        uint256 _timestamp
+    ) 
+        external 
+        view 
+        returns(uint256 amount, uint256 claimAmount, uint8 status) 
+    {
+        bytes32 key = getFlightKey(_airline, _flight, _timestamp);
+        (amount, claimAmount, status) = dataContract.getInsurance(msg.sender, key);
+    }
+
     function buyInsurance(address _airline, string calldata _flight, uint256 _timestamp) external payable {
         require(msg.value > 0, "must send some ether");
         
@@ -168,9 +181,26 @@ contract FlightSuretyApp {
         require(sent, "Failed to refund Ether");
     }
 
-    function getInsurance(address _airline, string calldata _flight, uint256 _timestamp) external view returns(uint256 amount) {
+    function claimInsurance(address _airline, string calldata _flight, uint256 _timestamp) external {
         bytes32 key = getFlightKey(_airline, _flight, _timestamp);
-        amount = dataContract.getInsurance(msg.sender, key);
+        require(flights[key].statusCode == STATUS_CODE_LATE_AIRLINE, "must be delayed due to airlines");
+
+        (uint256 amount,, uint8 status) = dataContract.getInsurance(msg.sender, key);
+        require(amount > 0, "must have bought insurance");
+        require(status == 0, "must not be claimed");
+        
+        uint256 claimableAmount = SafeMath.div(SafeMath.mul(amount, 150), 100);
+        dataContract.claimInsurance(msg.sender, key, claimableAmount);
+    }
+
+    function withDrawInsurance(address _airline, string calldata _flight, uint256 _timestamp) external {
+        bytes32 key = getFlightKey(_airline, _flight, _timestamp);
+        (, uint256 claimAmount, uint8 status) = dataContract.getInsurance(msg.sender, key);
+        require(status == 1, "must be claimed");
+
+        dataContract.withdrawInsurance(msg.sender, key);
+        (bool sent,) = msg.sender.call{value: claimAmount}("");
+        require(sent, "Failed to send Ether");
     }
     
    /**

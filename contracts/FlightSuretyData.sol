@@ -11,6 +11,10 @@ contract FlightSuretyData {
     address private contractOwner;         // Account used to deploy contract
     bool private operational = true;      // Blocks all state changes throughout the contract if false
 
+    uint8 private constant INSURANCE_BOUGHT = 0;
+    uint8 private constant INSURANCE_CLAIMED = 1;
+    uint8 private constant INSURANCE_WITHDRAWN = 2;
+
     struct Airline {
         int8 id;
         string name;
@@ -20,10 +24,16 @@ contract FlightSuretyData {
         uint256 balance;
     }
 
+    struct Insurance {
+        uint256 amount;
+        uint256 claimAmount;
+        uint8 status;
+    }
+
     mapping(address => mapping(address => bool)) votes; // { voterAddress => { airlineAddress => true }}
     mapping(address => Airline) airlines;
 
-    mapping(bytes32 => uint256) insurances;
+    mapping(bytes32 => Insurance) insurances;
     int8 airlinesCount;
 
     /********************************************************************************************/
@@ -168,14 +178,41 @@ contract FlightSuretyData {
        airlines[_airlineAddress].activated = true;
     }
 
-    function addInsurance(address passengerAddr, bytes32 _flightId, uint256 amount) external {
-        bytes32 key = keccak256(abi.encodePacked(passengerAddr, _flightId));
-        insurances[key] += amount;
+    function addInsurance(address _passengerAddr, bytes32 _flightKey, uint256 amount) external {
+        bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
+        insurances[key] = Insurance({amount: amount, claimAmount: 0, status: INSURANCE_BOUGHT});
     }
 
-    function getInsurance(address passengerAddr, bytes32 _flightId) external view returns(uint256) {
-        bytes32 key = keccak256(abi.encodePacked(passengerAddr, _flightId));
-        return insurances[key];
+    function getInsurance(
+        address _passengerAddr, 
+        bytes32 _flightKey
+    ) 
+        external 
+        view 
+        returns(uint256 amount, uint256 claimAmount, uint8 status) 
+    {
+        bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
+        
+        amount = insurances[key].amount;
+        claimAmount = insurances[key].claimAmount;
+        status = insurances[key].status;
+    }
+
+    function claimInsurance(
+        address _passengerAddr, 
+        bytes32 _flightKey, 
+        uint256 claimAmount
+    ) 
+        external 
+    {
+        bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
+        insurances[key].status = INSURANCE_CLAIMED;
+        insurances[key].claimAmount = claimAmount;
+    }
+
+    function withdrawInsurance(address _passengerAddr, bytes32 _flightKey) external {
+        bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
+        insurances[key].status = INSURANCE_WITHDRAWN;
     }
 
     /********************************************************************************************/
@@ -189,5 +226,9 @@ contract FlightSuretyData {
 
        votes[_voterAddress][_airlineAddress] = true;
        airlines[_airlineAddress].voteCount += 1;
+    }
+
+    function getInsuranceKey(address _passengerAddr, bytes32 _flightKey) pure private returns(bytes32) {
+        return keccak256(abi.encodePacked(_passengerAddr, _flightKey));
     }
 }

@@ -18,7 +18,7 @@ FlightStatusInfo({fromBlock: 0}, (error, event) => {
 OracleRequest({ fromBlock: 0 }, (error, event) => {
     if(error) {return}
 
-    const statusCode = sample(STATUS_CODES);
+    const statusCode = 20; // sample(STATUS_CODES);
     const { index, airline, flight, timestamp  } = event.returnValues;
     const intIndex = parseInt(index);
 

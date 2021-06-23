@@ -18,6 +18,24 @@ class Contract {
             .on("error", console.error);
     }
 
+    async claimInsuranceFor(airline, flight, timestamp, callback) {
+        const { claimInsurance } = this.contract.methods;
+        
+        claimInsurance(airline, flight, timestamp)
+            .send({ from: this.account })
+            .on("receipt", callback)
+            .on("error", console.error);
+    }
+
+    async withdrawInsuranceFor(airline, flight, timestamp, callback) {
+        const { withDrawInsurance } = this.contract.methods;
+        
+        withDrawInsurance(airline, flight, timestamp)
+            .send({ from: this.account })
+            .on("receipt", callback)
+            .on("error", console.error);
+    }
+
     async loadFlights() {
         const { fetchFlight, getInsurance } = this.contract.methods;
         let flights = [];
@@ -26,7 +44,7 @@ class Contract {
             config[this.networkName].flights.map(async flight => {
                 const { name, timestamp, airline } = flight;
                 const results = await fetchFlight(airline, name, timestamp).call();
-                const insuranceAmount = await getInsurance(airline, name, timestamp).call({from: this.account});
+                const {amount: insuranceAmount, status: insuranceStatus, claimAmount} = await getInsurance(airline, name, timestamp).call({from: this.account});
 
                 flights.push({ 
                     name, 
@@ -34,7 +52,9 @@ class Contract {
                     timestamp: results.timestamp, 
                     airlineName: results.airlineName,
                     statusCode: results.statusCode,
-                    amount: this.web3.utils.fromWei(insuranceAmount)
+                    amount: this.web3.utils.fromWei(insuranceAmount),
+                    claimAmount,
+                    insuranceStatus
                 });
             })
         );
