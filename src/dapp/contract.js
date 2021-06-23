@@ -15,7 +15,7 @@ class Contract {
         buyInsurance(airline, flight, timestamp)
             .send({from: this.account, value: this.web3.utils.toWei(amount)})
             .on("receipt", callback)
-            .on("error", console.error);
+            .on("error", this.onError);
     }
 
     async claimInsuranceFor(airline, flight, timestamp, callback) {
@@ -24,7 +24,7 @@ class Contract {
         claimInsurance(airline, flight, timestamp)
             .send({ from: this.account })
             .on("receipt", callback)
-            .on("error", console.error);
+            .on("error", this.onError);
     }
 
     async withdrawInsuranceFor(airline, flight, timestamp, callback) {
@@ -45,7 +45,7 @@ class Contract {
                 const { name, timestamp, airline } = flight;
                 const results = await fetchFlight(airline, name, timestamp).call();
                 const {amount: insuranceAmount, status: insuranceStatus, claimAmount} = await getInsurance(airline, name, timestamp).call({from: this.account});
-
+                
                 flights.push({ 
                     name, 
                     airline,
@@ -66,6 +66,10 @@ class Contract {
         const { fetchFlightStatus } = this.contract.methods;
 
         await fetchFlightStatus(airline, flight, timestamp).send({ from: this.account });
+    }
+
+    onError(error, receipt) {
+        alert(`${error.code}: ${error.message}`);
     }
 }
 

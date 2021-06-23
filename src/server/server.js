@@ -9,16 +9,12 @@ const STATUS_CODES = [10, 20, 30, 40, 50];
 
 const web3 = new Web3(new Web3.providers.WebsocketProvider(config.url.replace('http', 'ws')));
 const flightSuretyApp = new web3.eth.Contract(appAbi, config.appAddress);
-const { OracleRequest, FlightStatusInfo } = flightSuretyApp.events;
-
-FlightStatusInfo({fromBlock: 0}, (error, event) => {
-    console.log(event)
-})
+const { OracleRequest } = flightSuretyApp.events;
 
 OracleRequest({ fromBlock: 0 }, (error, event) => {
     if(error) {return}
 
-    const statusCode = 20; // sample(STATUS_CODES);
+    const statusCode = sample(STATUS_CODES);
     const { index, airline, flight, timestamp  } = event.returnValues;
     const intIndex = parseInt(index);
 
