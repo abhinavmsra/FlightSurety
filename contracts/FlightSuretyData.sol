@@ -9,6 +9,7 @@ contract FlightSuretyData {
     /********************************************************************************************/
 
     address private contractOwner;         // Account used to deploy contract
+    address private appContract;          // Contract address on main app
     bool private operational = true;      // Blocks all state changes throughout the contract if false
 
     uint8 private constant INSURANCE_BOUGHT = 0;
@@ -39,7 +40,12 @@ contract FlightSuretyData {
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
- 
+    event NewAppContract(address oldAddress, address newAddress);
+
+    /********************************************************************************************/
+    /*                                       Constructor                                        */
+    /********************************************************************************************/
+
     /**
     * @dev Constructor
     *      The deploying account becomes contractOwner
@@ -73,6 +79,14 @@ contract FlightSuretyData {
         _;
     }
 
+    /**
+    * @dev Modifier that requires the appContract to be the function caller
+    */
+    modifier requireAppContract() {
+        require(msg.sender == appContract, "Caller is not app contract");
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
@@ -95,6 +109,31 @@ contract FlightSuretyData {
         operational = mode;
     }
 
+    /**
+    * @dev Sets app contract address
+    *
+    * This allows contract owner to change app contract address, in case a new app is present
+    */    
+    function setAppContract(address _appContract) external requireContractOwner {
+        emit NewAppContract(appContract, _appContract);
+
+        appContract = _appContract;
+    }
+
+    /**
+    * @dev Get current app contract address
+    *
+    * This allows contract owner to fetch current app contract address
+    */    
+    function getAppContract() 
+        external 
+        view 
+        requireContractOwner 
+        returns (address)
+    {
+        return appContract;
+    }
+
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -110,7 +149,9 @@ contract FlightSuretyData {
         string memory _airlineName,
         bool consensus
     ) 
-        external 
+        external
+        requireIsOperational
+        requireAppContract 
     {
         _vote(_voterAddress, _airlineAddress);
         
@@ -134,7 +175,14 @@ contract FlightSuretyData {
     ) 
         external 
         view 
-        returns(int8 id, string memory name, bool consensus, int8 voteCount, bool activated, uint256 balance) 
+        returns(
+            int8 id, 
+            string memory name, 
+            bool consensus, 
+            int8 voteCount, 
+            bool activated, 
+            uint256 balance
+        ) 
     {
         id = airlines[_airlineAddress].id;
         name = airlines[_airlineAddress].name;
@@ -148,41 +196,100 @@ contract FlightSuretyData {
     * @dev Get an airline from address
     *
     */   
-    function getAirlineId(address _airlineAddress) external view returns(int8) {
-        return airlines[_airlineAddress].id;
+    function getAirlineId(address _airlineAddress) external view returns(int8 id) {
+        id = airlines[_airlineAddress].id;
     }
 
     /**
-    * @dev Get founders of the contract
+    * @dev Get total number of airlines in the contract
     *
     */   
-    function getAirlinesCount() external view returns(int8) {
-        return airlinesCount;
+    function getAirlinesCount() external view returns(int8 count) {
+        count = airlinesCount;
     }
 
-    function voteAirline(address _voterAddress, address _airlineAddress) external returns(int8) {
+    /**
+    * @dev Adds votes to an airline
+    *
+    */ 
+    function voteAirline(
+        address _voterAddress, 
+        address _airlineAddress
+    ) 
+        external 
+        requireIsOperational
+        requireAppContract 
+        returns(int8 voteCount) 
+    {
        _vote(_voterAddress, _airlineAddress);
 
-       return(airlines[_airlineAddress].voteCount);
+       voteCount = airlines[_airlineAddress].voteCount;
     }
 
-    function approveAirline(address _airlineAddress) external {
+    /**
+    * @dev Approves an airline
+    *
+    */
+    function approveAirline(
+        address _airlineAddress
+    ) 
+        external 
+        requireIsOperational
+        requireAppContract 
+    {
        airlines[_airlineAddress].consensus = true;
     }
 
-    function addAirlineBalance(address _airlineAddress, uint256 amount) external {
+    /**
+    * @dev Funds an airline balance
+    *
+    */
+    function addAirlineBalance(
+        address _airlineAddress, 
+        uint256 amount
+    ) 
+        external 
+        requireIsOperational
+        requireAppContract 
+    {
        airlines[_airlineAddress].balance += amount;
     }
 
-    function activateAirline(address _airlineAddress) external {
+    /**
+    * @dev Activates an airline
+    *
+    */
+    function activateAirline(
+        address _airlineAddress
+    ) 
+        external 
+        requireIsOperational
+        requireAppContract 
+    {
        airlines[_airlineAddress].activated = true;
     }
 
-    function addInsurance(address _passengerAddr, bytes32 _flightKey, uint256 amount) external {
+    /**
+    * @dev Adds an insurance for a flight & passenger
+    *
+    */
+    function addInsurance(
+        address _passengerAddr, 
+        bytes32 _flightKey, 
+        uint256 amount
+    ) 
+        external 
+        requireIsOperational
+        requireAppContract 
+    {
         bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
         insurances[key] = Insurance({amount: amount, claimAmount: 0, status: INSURANCE_BOUGHT});
     }
 
+    /**
+    * @dev Fetches an insurance details for a flight & passenger
+    *
+    */
     function getInsurance(
         address _passengerAddr, 
         bytes32 _flightKey
@@ -198,19 +305,36 @@ contract FlightSuretyData {
         status = insurances[key].status;
     }
 
+    /**
+    * @dev Claims an insurance for a flight & passenger
+    *
+    */
     function claimInsurance(
         address _passengerAddr, 
         bytes32 _flightKey, 
         uint256 claimAmount
     ) 
         external 
+        requireIsOperational
+        requireAppContract 
     {
         bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
         insurances[key].status = INSURANCE_CLAIMED;
         insurances[key].claimAmount = claimAmount;
     }
 
-    function withdrawInsurance(address _passengerAddr, bytes32 _flightKey) external {
+    /**
+    * @dev Marks an insurance as withdrawn
+    *
+    */
+    function withdrawInsurance(
+        address _passengerAddr, 
+        bytes32 _flightKey
+    ) 
+        external 
+        requireIsOperational
+        requireAppContract
+    {
         bytes32 key = getInsuranceKey(_passengerAddr, _flightKey);
         insurances[key].status = INSURANCE_WITHDRAWN;
     }
@@ -218,7 +342,10 @@ contract FlightSuretyData {
     /********************************************************************************************/
     /*                                     PRIVATE FUNCTIONS                                    */
     /********************************************************************************************/
-
+    /**
+    * @dev Adds votes to an airline
+    *
+    */
     function _vote(address _voterAddress, address _airlineAddress) private {
        // Allows contractOwner to vote themselves when creating first airline
        require((_voterAddress != _airlineAddress) || (airlinesCount == 0), "cant vote yourself");
@@ -228,6 +355,10 @@ contract FlightSuretyData {
        airlines[_airlineAddress].voteCount += 1;
     }
 
+    /**
+    * @dev Calculates a key for _passengerAddr & _flightKey
+    *
+    */
     function getInsuranceKey(address _passengerAddr, bytes32 _flightKey) pure private returns(bytes32) {
         return keccak256(abi.encodePacked(_passengerAddr, _flightKey));
     }

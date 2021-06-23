@@ -4,6 +4,7 @@ const Web3 = require('web3');
 const fs = require('fs');
 
 const airlineNames = [
+  'Crypto Airlines',
   'Bitcoin Airlines',
   'Ethereum Airlines',
   'Tether Airlines',
@@ -12,31 +13,38 @@ const airlineNames = [
 ];
 
 module.exports = async function(deployer, _, accounts) {
-  await deployer.deploy(FlightSuretyData);
-  await deployer.deploy(FlightSuretyApp, FlightSuretyData.address, "Crypto Airlines");
+  await deployer.deploy(FlightSuretyData, { from: accounts[0] });
+  await deployer.deploy(FlightSuretyApp, FlightSuretyData.address, { from: accounts[0] });
+
   const appContract = await FlightSuretyApp.deployed();
+  const dataContract = await FlightSuretyData.deployed();
+  const fundingAmount = web3.utils.toWei("10");
 
-  // Bootstraps Airlines
-  airlineNames.slice(0, 3).forEach(async (airlineName, index) => {
-    await appContract.registerAirline(accounts[index + 1], airlineName, { from: accounts[index] });
-  });
+  await dataContract.setAppContract(FlightSuretyApp.address, { from: accounts[0] });
+  await dataContract.setOperatingStatus(true, { from: accounts[0] });
 
-  await appContract.registerAirline(accounts[4], airlineNames[3], { from: accounts[1] });
-  await appContract.registerAirline(accounts[4], airlineNames[3], { from: accounts[2] });
+  await appContract.registerAirline(accounts[0], airlineNames[0], { from: accounts[0] });
+  await appContract.sendTransaction({ from: accounts[0], value: fundingAmount });
 
-  await appContract.registerAirline(accounts[5], airlineNames[4], { from: accounts[1] });
-  await appContract.registerAirline(accounts[5], airlineNames[4], { from: accounts[2] });
-  await appContract.registerAirline(accounts[5], airlineNames[4], { from: accounts[3] });
+  await appContract.registerAirline(accounts[1], airlineNames[1], { from: accounts[0] });
+  await appContract.sendTransaction({ from: accounts[1], value: fundingAmount });
 
-  // Fund accounts
-  const amount = web3.utils.toWei("10");
-  await appContract.sendTransaction({ from: accounts[1], value: amount });
-  await appContract.sendTransaction({ from: accounts[2], value: amount });
-  await appContract.sendTransaction({ from: accounts[3], value: amount });
-  await appContract.sendTransaction({ from: accounts[4], value: amount });
-  await appContract.sendTransaction({ from: accounts[5], value: amount });
+  await appContract.registerAirline(accounts[2], airlineNames[2], { from: accounts[1] });
+  await appContract.sendTransaction({ from: accounts[2], value: fundingAmount });
 
-  // Register Flights
+  await appContract.registerAirline(accounts[3], airlineNames[3], { from: accounts[2] });
+  await appContract.sendTransaction({ from: accounts[3], value: fundingAmount });
+
+  await appContract.registerAirline(accounts[4], airlineNames[4], { from: accounts[1] });
+  await appContract.registerAirline(accounts[4], airlineNames[4], { from: accounts[2] });
+  await appContract.sendTransaction({ from: accounts[4], value: fundingAmount });
+
+  await appContract.registerAirline(accounts[5], airlineNames[5], { from: accounts[1] });
+  await appContract.registerAirline(accounts[5], airlineNames[5], { from: accounts[2] });
+  await appContract.registerAirline(accounts[5], airlineNames[5], { from: accounts[3] });
+  await appContract.sendTransaction({ from: accounts[5], value: fundingAmount });
+
+  // // Register Flights
   let flights = [];
   for(let i = 0; i < 5; i++) {
     const timestamp = getRandomHourTimestamps();
@@ -57,7 +65,7 @@ module.exports = async function(deployer, _, accounts) {
 
   fs.writeFileSync(__dirname + '/../src/dapp/config.json', JSON.stringify(config, null, '\t'), 'utf-8');
 
-  // Register Oracles
+  // // Register Oracles
   config.localhost.oracles = {};
 
   await Promise.all(

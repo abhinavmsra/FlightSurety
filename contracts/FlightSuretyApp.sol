@@ -12,9 +12,9 @@ import "./FlightSuretyData.sol";
 
 /// @author Abhinav Mishra
 contract FlightSuretyApp {
-    /********************************************************************************************/
-    /*                                       DATA VARIABLES                                     */
-    /********************************************************************************************/
+    /*******************************************************************/
+    /*              DATA VARIABLES                                     */
+    /*******************************************************************/
 
     // Flight status codes
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
@@ -38,13 +38,10 @@ contract FlightSuretyApp {
     uint256 constant MINIMUM_FUNDING = 10 ether;
 
     FlightSuretyData private dataContract;
- 
-    /********************************************************************************************/
-    /*                                       FUNCTION MODIFIERS                                 */
-    /********************************************************************************************/
 
-    // Modifiers help avoid duplication of code. They are typically used to validate something
-    // before a function is allowed to be executed.
+    /*******************************************************************/
+    /*                      FUNCTION MODIFIERS                         */
+    /*******************************************************************/
 
     /**
     * @dev Modifier that requires the "operational" boolean variable to be "true"
@@ -64,11 +61,36 @@ contract FlightSuretyApp {
         _;
     }
 
+    /**
+    * @dev Modifier that requires the "RegisteredAirline" account to be the function caller
+    */
     modifier requireRegisteredAirline() {
-        require(isAirline(msg.sender), "Caller must be a airline");
+        require(isRegisteredAirline(msg.sender), "Caller must be a registered airline");
         _;
     }
 
+    /**
+    * @dev Modifier that requires the "ActivatedAirline" account to be the function caller
+    */
+    modifier requireActivatedAirline() {
+        require(isActivatedAirline(msg.sender), "Caller must be an active airline");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires an "ActivatedAirline" account or contract owner to be the function caller
+    */
+    modifier requireActivatedAirlineOrContractOwner() {
+        require(
+            isActivatedAirline(msg.sender) || (msg.sender == contractOwner), 
+            "Caller must either be an active airline or contract owner"
+        );
+        _;
+    }
+
+    /**
+    * @dev Modifier that demands a minimun funding amount
+    */
     modifier requireMinimumFunding() {
         require(msg.value >= MINIMUM_FUNDING, "Must send at least 10 ether");
         _;
@@ -82,32 +104,57 @@ contract FlightSuretyApp {
     * @dev Contract constructor
     *
     */
-    constructor(address payable _dataContractAddress, string memory _airlineName) {
+    constructor(address payable _dataContractAddress) {
         contractOwner = msg.sender;
         dataContract = FlightSuretyData(_dataContractAddress);
-        
-        // Create a default airlines
-        _registerNewAirline(contractOwner, _airlineName);
     }
 
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
+    /**
+    * @dev Returns whether the data contract is operational or not
+    *
+    */
     function isOperational() public view returns(bool) {
         return dataContract.isOperational();
     }
 
-    function isAirline(address addr) private view returns(bool) {
-        return dataContract.getAirlineId(addr) != 0;
+    /**
+    * @dev Sets contract operations on/off
+    *
+    * When operational mode is disabled, all write transactions except for this one will fail
+    */    
+    function setOperatingStatus(bool mode) external requireContractOwner {
+        dataContract.setOperatingStatus(mode);
     }
 
-    /********************************************************************************************/
-    /*                                     SMART CONTRACT FUNCTIONS                             */
-    /********************************************************************************************/
+    /**
+    * @dev Returns whether the airline is registered or not
+    *
+    */
+    function isRegisteredAirline(address addr) private view returns(bool registered) {
+        (int8 id,,,,,) = dataContract.getAirline(addr);
+        
+        registered = (id != 0);
+    }
+
+    /**
+    * @dev Returns whether the airline is activated for operating or not
+    *
+    */
+    function isActivatedAirline(address addr) private view returns(bool activated) {
+        (,,,,activated,) = dataContract.getAirline(addr);
+    }
+
+    /******************************************************************************/
+    /*                       SMART CONTRACT FUNCTIONS                             */
+    /******************************************************************************/
 
    /**
     * @dev Add an airline to the registration queue
+    *  It registers a new airline & adds votes for existing airlines    
     *
     **/   
     function registerAirline(
@@ -116,7 +163,7 @@ contract FlightSuretyApp {
     ) 
         external 
         requireIsOperational 
-        requireRegisteredAirline 
+        requireActivatedAirlineOrContractOwner 
     {
         if (dataContract.getAirlineId(_airlineAddress) == 0) { // Registration Request
             _registerNewAirline(_airlineAddress, _airlineName);
@@ -129,7 +176,13 @@ contract FlightSuretyApp {
     * @dev Register a future flight for insuring.
     *
     */  
-    function registerFlight(string calldata _flight, uint256 _timestamp) external requireRegisteredAirline {
+    function registerFlight(
+        string calldata _flight, 
+        uint256 _timestamp
+    ) 
+        external 
+        requireActivatedAirline 
+    {
         bytes32 key = getFlightKey(msg.sender, _flight, _timestamp);
 
         flights[key] = Flight({ isRegistered: true, statusCode: STATUS_CODE_UNKNOWN, updatedTimestamp: _timestamp, airline: msg.sender });
@@ -268,7 +321,11 @@ contract FlightSuretyApp {
         }
     }
 
-    function _receiveAirlineFunds() private requireRegisteredAirline requireMinimumFunding {
+    function _receiveAirlineFunds() 
+        private 
+        requireRegisteredAirline 
+        requireMinimumFunding 
+    {
         dataContract.addAirlineBalance(msg.sender, msg.value);
         dataContract.activateAirline(msg.sender);
     }

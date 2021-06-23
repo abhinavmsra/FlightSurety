@@ -19,21 +19,24 @@ var Config = async function(accounts) {
         "0x2f2899d6d35b1a48a4fbdc93a37a72f264a9fca7"
     ];
 
-
-    let owner = accounts[0];
-    let firstAirline = accounts[1];
-
-    let flightSuretyData = await FlightSuretyData.new();
-    let flightSuretyApp = await FlightSuretyApp.new();
-
+    const dataContractOwner = accounts[0];
+    const appContractOwner = accounts[1];
+    const fundingAmount = web3.utils.toWei("10");
+    const dataContract = await FlightSuretyData.new({from: dataContractOwner});
+    const appContract = await FlightSuretyApp.new(dataContract.address, { from: appContractOwner });
     
+    await dataContract.setAppContract(appContract.address, { from: accounts[0] });
+    await dataContract.setOperatingStatus(true, {from: dataContractOwner});
+    await appContract.registerAirline(appContractOwner, 'Crypto Airlines', { from: appContractOwner });
+    await appContract.sendTransaction({ from: appContractOwner, value: fundingAmount });
+
     return {
-        owner: owner,
-        firstAirline: firstAirline,
+        owner: appContractOwner,
+        firstAirline: appContractOwner,
         weiMultiple: (new BigNumber(10)).pow(18),
         testAddresses: testAddresses,
-        flightSuretyData: flightSuretyData,
-        flightSuretyApp: flightSuretyApp
+        flightSuretyData: dataContract,
+        flightSuretyApp: appContract
     }
 }
 
